@@ -9,7 +9,247 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Pacifico&family=Playfair+Display:wght@700&family=Roboto:wght@400;700&family=Montserrat:wght@700&family=ZCOOL+QingKe+HuangYou&family=Ma+Shan+Zheng&family=Liu+Jian+Mao+Cao&family=Noto+Sans+SC:wght@300;400;500&family=Long+Cang&family=ZCOOL+XiaoWei&family=Caveat:wght@700&family=Shadows+Into+Light&family=Fredericka+the+Great&family=Special+Elite&display=swap" rel="stylesheet">
     
-  <script src="https://code.bdstatic.com/npm/leancloud-storage@4.12.0/dist/av-min.js"></script>
+  <script>
+        // === Cloudflare Workers + D1 API 适配层 (完全兼容原 AV 调用) ===
+        const API_BASE = "https://api.704455268.xyz";
+
+        async function apiFetch(path, options = {}) {
+            const token = localStorage.getItem('yujian_token');
+            const headers = Object.assign({ 'Content-Type': 'application/json' }, options.headers || {});
+            if (token) headers['Authorization'] = 'Bearer ' + token;
+            const res = await fetch(API_BASE + path, Object.assign({}, options, { headers }));
+            const text = await res.text();
+            let data = {};
+            try { data = text ? JSON.parse(text) : {}; } catch (e) { data = { error: text }; }
+            if (!res.ok) {
+                const err = new Error(data.error || data.message || ('HTTP ' + res.status));
+                err.code = data.code || res.status;
+                throw err;
+            }
+            return data;
+        }
+
+        class D1Object {
+            constructor(className, data = {}) {
+                this._className = className;
+                this._data = Object.assign({}, data);
+                this.id = data.id || data.objectId || data.object_id || null;
+                this.createdAt = data.createdAt || data.created_at || null;
+                this._increments = {};
+            }
+            get(key) {
+                if (key === 'owner' && this._data.ownerId) {
+                    return { id: this._data.ownerId };
+                }
+                return this._data[key];
+            }
+            set(key, val) {
+                if (key === 'owner' && val && val.id) {
+                    this._data.ownerId = val.id;
+                } else {
+                    this._data[key] = val;
+                }
+            }
+            increment(key, amount = 1) {
+                this._increments[key] = (this._increments[key] || 0) + amount;
+                this._data[key] = (this._data[key] || 0) + amount;
+            }
+            setACL() {}
+            async save() {
+                if (this._className === 'UserNavData') {
+                    const res = await apiFetch('/api/nav', {
+                        method: 'POST',
+                        body: JSON.stringify(this._data.content || {})
+                    });
+                    if (res && res.id) this.id = res.id;
+                    return this;
+                }
+                if (this._className === 'CommunitySite') {
+                    if (this.id && Object.keys(this._increments).length > 0) {
+                        // Vote increment handled by /api/community-sites/:id/vote or direct update
+                        return this;
+                    }
+                    const payload = {
+                        title: this._data.title,
+                        url: this._data.url,
+                        category: this._data.category,
+                        tag: this._data.tag,
+                        desc: this._data.desc || ''
+                    };
+                    const res = await apiFetch('/api/community-sites', {
+                        method: 'POST',
+                        body: JSON.stringify(payload)
+                    });
+                    const item = res.site || res.data || res;
+                    if (item && (item.id || item.object_id)) this.id = item.id || item.object_id;
+                    return this;
+                }
+                if (this._className === 'SiteVote') {
+                    const res = await apiFetch('/api/community-sites/' + this._data.siteId + '/vote', {
+                        method: 'POST',
+                        body: JSON.stringify({ type: this._data.type })
+                    });
+                    return this;
+                }
+                return this;
+            }
+            async destroy() {
+                if (this._className === 'CommunitySite' && this.id) {
+                    await apiFetch('/api/community-sites/' + this.id, { method: 'DELETE' });
+                } else if (this._className === 'SiteVote' && this._data.siteId) {
+                    await apiFetch('/api/community-sites/' + this._data.siteId + '/vote', {
+                        method: 'POST',
+                        body: JSON.stringify({ type: this._data.type, cancel: true })
+                    });
+                }
+            }
+        }
+
+        class D1Query {
+            constructor(className) {
+                this._className = className;
+                this._filters = {};
+                this._sort = 'new';
+                this._limit = 99;
+            }
+            equalTo(key, val) {
+                this._filters[key] = (val && typeof val === 'object' && val.id) ? val.id : val;
+            }
+            addDescending(field) {
+                if (field === 'upVotes' || field === 'likes') this._sort = 'hot';
+                else this._sort = 'new';
+            }
+            limit(n) { this._limit = n; }
+            async first() {
+                const list = await this.find();
+                return list.length > 0 ? list[0] : null;
+            }
+            async find() {
+                if (this._className === 'UserNavData') {
+                    const res = await apiFetch('/api/nav');
+                    const content = res.content || res.data || res;
+                    if (content && (content.categories || content.bookmarks || content.settings)) {
+                        return [new D1Object('UserNavData', { id: 'nav', content })];
+                    }
+                    return [];
+                }
+                if (this._className === 'CommunitySite') {
+                    const params = new URLSearchParams();
+                    if (this._filters.owner) params.set('mine', '1');
+                    if (this._filters.category) params.set('category', this._filters.category);
+                    if (this._filters.tag) params.set('tag', this._filters.tag);
+                    if (this._sort) params.set('sort', this._sort);
+                    if (this._limit) params.set('limit', String(this._limit));
+                    const qs = params.toString();
+                    const res = await apiFetch('/api/community-sites' + (qs ? '?' + qs : ''));
+                    const rows = Array.isArray(res) ? res : (res.sites || res.results || res.data || []);
+                    return rows.map(r => new D1Object('CommunitySite', {
+                        id: r.id || r.object_id || r.objectId,
+                        title: r.title,
+                        url: r.url,
+                        category: r.category,
+                        tag: r.tag,
+                        desc: r.desc || r.description || '',
+                        upVotes: r.upVotes ?? r.up_votes ?? r.likes ?? 0,
+                        downVotes: r.downVotes ?? r.down_votes ?? 0,
+                        ownerId: r.ownerId || r.owner_id || r.user_id || null,
+                        createdAt: r.createdAt || r.created_at
+                    }));
+                }
+                if (this._className === 'SiteVote') {
+                    const res = await apiFetch('/api/community-sites/votes/me').catch(() => ({ votes: [] }));
+                    const rows = Array.isArray(res) ? res : (res.votes || res.results || res.data || []);
+                    let mapped = rows.map(r => new D1Object('SiteVote', {
+                        id: r.id || r.object_id,
+                        siteId: r.siteId || r.site_id,
+                        type: r.type || r.vote_type
+                    }));
+                    if (this._filters.siteId) {
+                        mapped = mapped.filter(v => v.get('siteId') === this._filters.siteId);
+                    }
+                    return mapped;
+                }
+                return [];
+            }
+        }
+
+        class D1User {
+            constructor(data = {}) {
+                this._data = Object.assign({}, data);
+                this.id = data.id || data.object_id || data.objectId || null;
+            }
+            getUsername() { return this._data.username || ''; }
+            getEmail() { return this._data.email || ''; }
+            get(k) { return this._data[k]; }
+            setUsername(u) { this._data.username = u; }
+            setPassword(p) { this._data.password = p; }
+            setEmail(e) { this._data.email = e; }
+            async fetch() {
+                const res = await apiFetch('/api/auth/me');
+                const u = res.user || res;
+                Object.assign(this._data, u);
+                this.id = u.id || u.object_id || this.id;
+                localStorage.setItem('yujian_user', JSON.stringify(this._data));
+                return this;
+            }
+            async signUp() {
+                return await apiFetch('/api/auth/register', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        username: this._data.username,
+                        password: this._data.password,
+                        email: this._data.email || ''
+                    })
+                });
+            }
+            static current() {
+                const token = localStorage.getItem('yujian_token');
+                const raw = localStorage.getItem('yujian_user');
+                if (!token || !raw) return null;
+                try { return new D1User(JSON.parse(raw)); } catch (e) { return null; }
+            }
+            static async logIn(username, password) {
+                const res = await apiFetch('/api/auth/login', {
+                    method: 'POST',
+                    body: JSON.stringify({ username, password })
+                });
+                const token = res.token || res.sessionToken;
+                const user = res.user || { id: res.userId, username };
+                if (token) localStorage.setItem('yujian_token', token);
+                localStorage.setItem('yujian_user', JSON.stringify(user));
+                return new D1User(user);
+            }
+            static async loginWithEmail(email, password) {
+                return await D1User.logIn(email, password);
+            }
+            static async logOut() {
+                localStorage.removeItem('yujian_token');
+                localStorage.removeItem('yujian_user');
+            }
+            static async requestPasswordReset(email) {
+                return await apiFetch('/api/auth/forgot-password', {
+                    method: 'POST',
+                    body: JSON.stringify({ email })
+                });
+            }
+        }
+
+        const AV = {
+            User: D1User,
+            Query: D1Query,
+            Object: Object.assign(D1Object, {
+                extend: (name) => class extends D1Object { constructor(d) { super(name, d); } },
+                createWithoutData: (name, id) => new D1Object(name, { id })
+            }),
+            ACL: class {
+                setPublicReadAccess() {}
+                setPublicWriteAccess() {}
+                setReadAccess() {}
+                setWriteAccess() {}
+            },
+            init: () => {}
+        };
+    </script>
 
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 
@@ -3594,14 +3834,8 @@ html.comm-auto-hide #triggerBtn.show {
     </div>
 
     <script>
-        // ✨✨✨ 第三步：在这里初始化 LeanCloud ✨✨✨
+        // === 已切换至 Cloudflare Workers + D1 (https://api.704455268.xyz) ===
         const { Query, User } = AV;
-
-        AV.init({
-            appId: "08BLrj6itsBOdT7OSdxSZZ8Q-MdYXbMMI",       // 这里填你的 AppID
-            appKey: "51CukflK39Mqa7qwZ1qHn8zj",     // 这里填你的 AppKey
-            serverURL: "https://08blrj6i.api.lncldglobal.com"
-        });
 
         // ============================================
         // 全局变量和常量定义
@@ -7666,40 +7900,7 @@ window.importFromComm = function() {
     }
 };
 
-// --- 核心修复：点赞点踩逻辑 ---
-async function handleVote(id, type) {
-    // 1. 登录校验
-    const currentUser = AV.User.current();
-    if (!currentUser) {
-        if (typeof showToast === 'function') showToast('请先登录后再操作');
-        else alert('请先登录后再点赞/点踩');
-        return;
-    }
-
-    try {
-        const item = AV.Object.createWithoutData('CommunitySite', id);
-        // 使用 LeanCloud 的原子增加操作，防止并发数据错误
-        if (type === 'up') {
-            item.increment('upVotes', 1);
-        } else {
-            item.increment('downVotes', 1);
-        }
-        
-        await item.save();
-        
-        // 实时反馈：更新当前页面的数字（无需重新加载整个列表）
-        const countEl = event.target.closest('span').querySelector('small');
-        if (countEl) {
-            countEl.innerText = parseInt(countEl.innerText) + 1;
-            event.target.style.color = type === 'up' ? '#2ecc71' : '#e74c3c';
-        }
-        
-        if (typeof showToast === 'function') showToast('投票成功');
-    } catch (e) {
-        console.error("投票失败:", e);
-        if (typeof showToast === 'function') showToast('操作失败，请重试');
-    }
-}
+// 已统一使用上方 window.handleVote 对接 Cloudflare D1
 
 // --- 修复主页网站删除功能 ---
 window.deleteLink = function() {
