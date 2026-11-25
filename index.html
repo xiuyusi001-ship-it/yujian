@@ -6,8 +6,9 @@
     <title>屿间导航</title>
     <link rel="icon" type="image/png" href="https://github.com/xiuyusi001-ship-it/yujian/blob/main/logo.png?raw=true">
     
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Pacifico&family=Playfair+Display:wght@700&family=Roboto:wght@400;700&family=Montserrat:wght@700&family=ZCOOL+QingKe+HuangYou&family=Ma+Shan+Zheng&family=Liu+Jian+Mao+Cao&family=Noto+Sans+SC:wght@300;400;500&family=Long+Cang&family=ZCOOL+XiaoWei&family=Caveat:wght@700&family=Shadows+Into+Light&family=Fredericka+the+Great&family=Special+Elite&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.staticfile.net/font-awesome/6.4.0/css/all.min.css" onerror="this.onerror=null;this.href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'">
+    <!-- V1.1: font families loaded on demand; system fallback is immediate -->
+    <style> .page-title,.page-subtitle { font-display:swap; } </style>
     
   <script>
         // === Cloudflare Workers + D1 API 适配层 (完全兼容原 AV 调用) ===
@@ -251,7 +252,7 @@
         };
     </script>
 
-<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+<script src="https://cdn.staticfile.net/Sortable/1.15.0/Sortable.min.js" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js'"></script>
 
     <style>
             :root {
@@ -2717,7 +2718,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: : 10px 15px;
+    padding: 10px 15px;
     font-size: 14px;
     color: #333;
 }
@@ -3226,6 +3227,11 @@ html.comm-auto-hide #triggerBtn.show {
 }       
 
     </style>
+<style>
+html.fab-auto-hide #settingsBtn:not(.menu-open):not(.confirm-mode):not(.edge-reveal) { opacity:0 !important; transform:scale(.4) rotate(-90deg) !important; pointer-events:none !important; }
+html.fab-auto-hide #settingsBtn.menu-open, html.fab-auto-hide #settingsBtn.confirm-mode, html.fab-auto-hide #settingsBtn.edge-reveal { opacity:1 !important; transform:scale(1) !important; pointer-events:auto !important; }
+</style>
+<script>try { document.documentElement.classList.toggle('comm-auto-hide', localStorage.getItem('cfg_commAutoHide') === 'true'); document.documentElement.classList.toggle('fab-auto-hide', localStorage.getItem('cfg_fabAutoHidden') === 'true'); } catch(e) {}</script>
 </head>
 <body>
 <script>
@@ -3505,13 +3511,13 @@ html.comm-auto-hide #triggerBtn.show {
 </button>
 
     <div style="display: flex; gap: 10px;">
-        <button onclick="importFromComm()" style="background: #607d8b; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-size: 13px;">
+        <button type="button" onclick="importFromComm()" style="background: #607d8b; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-size: 13px;">
             <i class="fas fa-file-import"></i> 导入复制
         </button>
-        <button onclick="closeEditModal()" style="background: #eee; color: #666; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-size: 13px;">
+        <button type="button" onclick="closeModal(elements.editBookmarkModal)" style="background: #eee; color: #666; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-size: 13px;">
             取消
         </button>
-        <button onclick="saveLink()" style="background: var(--primary-color); color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">
+        <button type="submit" style="background: var(--primary-color); color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">
             保存
         </button>
     </div>
@@ -4271,7 +4277,7 @@ html.comm-auto-hide #triggerBtn.show {
                 pageSubtitleFontSize: '24px',
                 pageTitleFont: 'Pacifico, cursive',
                 pageSubtitleFont: "'Long Cang', cursive",
-                searchEngine: 'google',
+                searchEngine: 'baidu',
                 categoryColor: '#4e342e', // 修正：分类文字颜色也对齐
                 bookmarkColor: '#4e342e', // 修正：书签文字颜色也对齐
                 rowsPerCategory: 4,
@@ -4510,10 +4516,11 @@ html.comm-auto-hide #triggerBtn.show {
 
             try {
                 console.log('🔄 正在下载并转换背景:', url);
-                const response = await fetch(url);
+                const response = await fetch(url, {signal: AbortSignal.timeout ? AbortSignal.timeout(8000) : undefined});
                 if (!response.ok) throw new Error('下载失败');
 
-                const blob = await response.blob();
+                let blob = await response.blob();
+                if (blob.size > 450000 && /^image\/(jpeg|png|webp)$/.test(blob.type)) blob = await compactBackground(blob);
 
                 // 2. 容量保护：如果图太大 (超过 2MB)，为了防止爆缓存，直接放弃转换，返回原链接
                 if (blob.size > 2 * 1024 * 1024) {
@@ -4554,7 +4561,7 @@ html.comm-auto-hide #triggerBtn.show {
                 const base64Bg = await processAndSetBackground(currentBg);
                 
                 // 4. 如果转换结果变了（说明转换成功，变成了 data:image...）
-                if (base64Bg.startsWith('data:image')) {
+                if (base64Bg.startsWith('data:image') && state.settings.backgroundValue === currentBg && state.settings.backgroundType === 'image') {
                     console.log('🎉 背景转存成功！正在更新本地存储...');
                     
                     // 5. 更新状态
@@ -4571,7 +4578,10 @@ html.comm-auto-hide #triggerBtn.show {
         }
 
         // ✨✨✨ 找回丢失的 saveData 函数 ✨✨✨
+        let navSaveQueue = Promise.resolve();
+        let navRevision = 0;
         async function saveData(forceCloud = false) {
+            const revision = ++navRevision;
             // 1. 保存到本地
             try {
                 const dataToSave = {
@@ -4592,36 +4602,23 @@ html.comm-auto-hide #triggerBtn.show {
             // 2. 同步到 LeanCloud (如果已登录)
             const user = AV.User.current();
             if (user) {
-                try {
-                    const query = new AV.Query('UserNavData');
-                    query.equalTo('owner', user);
-                    let record = await query.first();
-                    
-                    if (!record) {
-                        const UserNavData = AV.Object.extend('UserNavData');
-                        record = new UserNavData();
-                        record.set('owner', user);
-                        
-                        // 设置 ACL 权限
-                        const acl = new AV.ACL();
-                        acl.setPublicReadAccess(false);
-                        acl.setPublicWriteAccess(false);
-                        acl.setReadAccess(user, true);
-                        acl.setWriteAccess(user, true);
-                        record.setACL(acl);
-                    }
-                    
-                    record.set('content', {
-                        categories: state.categories,
-                        bookmarks: state.bookmarks,
-                        settings: state.settings
-                    });
-                    
-                    await record.save();
-                    console.log('☁️ 云端同步成功');
-                } catch (error) {
-                    console.error('❌ 云端同步失败:', error);
-                }
+                const snapshot = JSON.stringify({categories:state.categories, bookmarks:state.bookmarks, settings:state.settings});
+                const pendingKey = 'navPending:' + user.id;
+                try { localStorage.setItem(pendingKey, 'true'); localStorage.setItem('navCacheOwner', String(user.id)); } catch(e) {}
+                const token = localStorage.getItem('yujian_token');
+                const task = async () => {
+                    if (revision !== navRevision || localStorage.getItem('yujian_token') !== token) return;
+                    try {
+                        await apiFetch('/api/nav', {method:'POST', body:snapshot});
+                        if (revision === navRevision && localStorage.getItem('yujian_token') === token) {
+                            localStorage.removeItem(pendingKey);
+                            localStorage.removeItem('navPendingSnapshot:' + user.id);
+                        }
+                        console.log('☁️ 云端同步成功');
+                    } catch (error) { console.error('❌ 云端同步失败:', error); }
+                };
+                navSaveQueue = navSaveQueue.then(task, task);
+                await navSaveQueue;
             }
         }
 
@@ -4633,6 +4630,7 @@ html.comm-auto-hide #triggerBtn.show {
 
         // 1. 加载数据 (包含防崩溃和空数据自动恢复)
         async function loadData() {
+            const loadRevision = navRevision;
             console.log('🚀 开始加载数据流程...');
             let localData = null;
             
@@ -4657,7 +4655,13 @@ html.comm-auto-hide #triggerBtn.show {
                 try {
                     const query = new AV.Query('UserNavData');
                     query.equalTo('owner', user);
+                    if (localStorage.getItem('navPending:' + user.id) === 'true') {
+                        const stored = localStorage.getItem('navPendingSnapshot:' + user.id);
+                        if (stored) { applyLoadedData(JSON.parse(stored)); await saveData(true); return; }
+                        if (localData && (!localStorage.getItem('navCacheOwner') || localStorage.getItem('navCacheOwner') === String(user.id))) { await saveData(true); return; }
+                    }
                     const record = await query.first();
+                    if (loadRevision !== navRevision || state.editMode || AV.User.current()?.id !== user.id) return;
                     
                     if (record) {
                         const cloudData = record.get('content');
@@ -4674,6 +4678,7 @@ html.comm-auto-hide #triggerBtn.show {
                         if (!localData || JSON.stringify(localData) !== JSON.stringify(cloudData)) {
                             console.log('🔄 同步云端数据...');
                             localStorage.setItem('navPageData', JSON.stringify(cloudData));
+                            localStorage.setItem('navCacheOwner', String(user.id));
                             applyLoadedData(cloudData);
                         }
                     } else {
@@ -5126,10 +5131,15 @@ html.comm-auto-hide #triggerBtn.show {
                     if (user) {
                         if(confirm(`当前登录用户：${user.getUsername()}\n确定要退出登录吗？`)) {
                             // 1. 登出云端
+                            if (localStorage.getItem('navPending:' + user.id) === 'true') {
+                                try { localStorage.setItem('navPendingSnapshot:' + user.id, localStorage.getItem('navPageData') || JSON.stringify({categories:state.categories,bookmarks:state.bookmarks,settings:state.settings})); }
+                                catch(e) { alert('本地存储空间不足，暂未同步的数据无法安全保留，请联网后再退出。'); return; }
+                            }
                             AV.User.logOut();
                             
                             // 2. === 核心修复：必须清除本地缓存 ===
                             localStorage.removeItem('navPageData');
+                            localStorage.removeItem('navCacheOwner');
                             
                             // 3. 刷新页面
                             location.reload(); 
@@ -5647,7 +5657,7 @@ html.comm-auto-hide #triggerBtn.show {
             try {
                 const domain = new URL(url).hostname;
                 // 修改为国内源，防止后台预加载时卡顿
-                const faviconUrl = `https://api.iowen.cn/favicon/${domain}.png`;
+                const faviconUrl = `https://api.iowen.cn/favicon/${encodeURIComponent(domain)}.png`;
                 state.faviconCache[url] = faviconUrl;
                 return faviconUrl;
             } catch (error) {
@@ -5701,10 +5711,12 @@ html.comm-auto-hide #triggerBtn.show {
                 // 分类主按钮
                 const button = document.createElement('button');
                 button.className = 'category-btn';
+                button.dataset.id = category.id;
+                button.dataset.id = category.id;
                 if (category.id === state.currentCategory) {
                     button.classList.add('active');
                 }
-                button.innerHTML = `<span>${category.name}</span>`;
+                const label = document.createElement('span'); label.textContent = category.name; button.appendChild(label);
                 button.onclick = () => setActiveCategory(category.id);
                 
                 categoryItem.appendChild(button);
@@ -5820,7 +5832,7 @@ html.comm-auto-hide #triggerBtn.show {
 
             // 2. 核心补全：全部渲染完成后激活拖拽
             if (typeof initLinkSortable === 'function') {
-                setTimeout(initLinkSortable, 100); 
+                initLinkSortable(); 
             }
         } // 这里才闭合 renderBookmarks 函数
         
@@ -5865,43 +5877,16 @@ html.comm-auto-hide #triggerBtn.show {
                 placeholderIcon.style.cssText = 'color:#fff; font-size:14px; position:absolute; z-index:1;';
                 iconDiv.appendChild(placeholderIcon);
 
-                // 4. Google源加载逻辑
+                // 4. 国内图标源、缓存与失败回退
                 if (bookmark.customIcon && !bookmark.customIcon.includes('/') && !bookmark.customIcon.includes('.')) {
                      iconDiv.style.background = 'transparent';
-                     iconDiv.innerHTML = `<i class="${bookmark.customIcon}" style="font-size:18px; color:#fff;"></i>`;
+                     const custom = document.createElement('i'); custom.className = bookmark.customIcon; custom.style.cssText='font-size:18px;color:#fff'; iconDiv.replaceChildren(custom);
                 } 
                 else {
-                    let targetSrc = '';
-                    
-                    if (bookmark.customIcon) {
-                        targetSrc = bookmark.customIcon;
-                    } else {
-                        let domain = '';
-                        try { domain = new URL(bookmark.url).hostname; } catch(e){}
-                        targetSrc = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
-                    }
+                    iconDiv.dataset.iconUrl = bookmark.url;
+                    iconDiv.dataset.customIcon = bookmark.customIcon || '';
+                    if (String(bookmark.categoryId) === String(state.currentCategory)) loadBookmarkIcon(iconDiv);
 
-                    const img = new Image();
-                    img.src = targetSrc;
-
-                    img.onload = () => {
-                        if (img.naturalWidth < 32 && !bookmark.customIcon) {
-                            return;
-                        }
-
-                        iconDiv.style.background = 'transparent'; 
-                        iconDiv.style.borderRadius = '0';
-                        iconDiv.innerHTML = '';
-
-                        const realImg = document.createElement('img');
-                        realImg.src = targetSrc;
-                        realImg.style.cssText = 'width:100%; height:100%; object-fit:contain; border-radius:4px; animation: fadeIn 0.5s;';
-                        iconDiv.appendChild(realImg);
-                    };
-
-                    img.onerror = () => {
-                        // 保持默认彩色图标
-                    };
                 }
 
                 // 5. 网站名称 - 修复：使用稍细的字体
@@ -6000,6 +5985,8 @@ html.comm-auto-hide #triggerBtn.show {
                 fastStyle.remove(); 
             }
             const settings = state.settings;
+            if (settings.pageTitle) loadNavFont(settings.pageTitleFont);
+            if (settings.pageSubtitle) loadNavFont(settings.pageSubtitleFont);
             // 给 body 加标记，方便 CSS 针对不同皮肤做变形
             document.body.dataset.skin = settings.currentSkin; 
             
@@ -6360,6 +6347,7 @@ html.comm-auto-hide #triggerBtn.show {
                 if (section.id === `category-${categoryId}`) {
                     section.classList.add('active');
                     section.style.display = 'block';
+                    section.querySelectorAll('[data-icon-url]').forEach(loadBookmarkIcon);
                 } else {
                     section.classList.remove('active');
                     section.style.display = 'none';
@@ -6685,6 +6673,7 @@ html.comm-auto-hide #triggerBtn.show {
 
         // 切换编辑模式
         function toggleEditMode() {
+            if (state.editMode) { exitEditMode(); return; }
             state.editMode = !state.editMode;
             document.body.classList.toggle('edit-mode', state.editMode);
             
@@ -6705,6 +6694,10 @@ html.comm-auto-hide #triggerBtn.show {
 
         // 退出编辑模式
         function exitEditMode() {
+            if (state.editMode) {
+                document.querySelectorAll('.bookmarks-grid').forEach(grid => persistGridOrder(grid, false));
+                saveData();
+            }
             state.editMode = false;
             document.body.classList.remove('edit-mode');
             elements.settingsBtn.innerHTML = '<i class="fas fa-cog"></i>';
@@ -6730,6 +6723,7 @@ html.comm-auto-hide #triggerBtn.show {
             
             elements.settingsMenu.classList.remove('show');
             elements.colorBgModal.style.display = 'flex';
+            if (document.getElementById('fontsTab').classList.contains('active')) state.fontLibrary.forEach(f=>loadNavFont(f.value));
             
             // 更新颜色选择器的值
             elements.textColorPicker.value = state.settings.textColor;
@@ -6833,7 +6827,7 @@ html.comm-auto-hide #triggerBtn.show {
             }
             
             const selectedIcon = document.querySelector('.icon-option.selected');
-            const customIcon = selectedIcon ? selectedIcon.dataset.icon : null;
+            const customIcon = selectedIcon ? selectedIcon.dataset.icon : (state.bookmarks.find(b=>b.id===state.editingBookmarkId)?.customIcon || null);
             
             if (state.editingBookmarkId) {
                 const bookmark = state.bookmarks.find(b => b.id === state.editingBookmarkId);
@@ -7113,6 +7107,7 @@ html.comm-auto-hide #triggerBtn.show {
                     tab.classList.add('active');
                     document.querySelectorAll('.color-tab-content').forEach(content => content.classList.remove('active'));
                     document.getElementById(tabId + 'Tab').classList.add('active');
+                    if (tabId === 'fonts') state.fontLibrary.forEach(f=>loadNavFont(f.value));
                 });
             });
 
@@ -7200,130 +7195,7 @@ html.comm-auto-hide #triggerBtn.show {
             }
         };
 
-// ================= 智能开关逻辑 (粘贴到 script 标签最后) =================
-
-(function() {
-    // 1. 配置状态
-    let appConfig = {
-        communityEnabled: false,
-        fabAutoHidden: false
-    };
-
-    // 2. 初始化：读取本地存储
-    const savedComm = localStorage.getItem('cfg_communityEnabled');
-    const savedFab = localStorage.getItem('cfg_fabAutoHidden');
-    
-    if (savedComm !== null) appConfig.communityEnabled = (savedComm === 'true');
-    if (savedFab !== null) appConfig.fabAutoHidden = (savedFab === 'true');
-
-    // 3. 同步开关 UI 状态
-    const commSwitch = document.getElementById('toggleCommunityBtn');
-    const fabSwitch = document.getElementById('toggleFabHideBtn');
-    
-    if(commSwitch) commSwitch.checked = appConfig.communityEnabled;
-    if(fabSwitch) fabSwitch.checked = appConfig.fabAutoHidden;
-
-    // 4. 应用设置的核心函数
-    window.applySmartSettings = function() {
-        // --- A. 社区开关逻辑 ---
-        const triggerBtn = document.getElementById('triggerBtn');
-        const edgeLight = document.getElementById('edgeLight');
-        
-        if (appConfig.communityEnabled) {
-            if(triggerBtn) triggerBtn.style.display = 'flex'; // 恢复显示
-            if(edgeLight) edgeLight.style.display = 'block';
-        } else {
-            if(triggerBtn) triggerBtn.style.display = 'none'; // 隐藏
-            if(edgeLight) edgeLight.style.display = 'none';
-            // 如果侧边栏开着，关掉它
-            const drawer = document.getElementById('commDrawer');
-            if(drawer) drawer.classList.remove('active');
-        }
-
-        // --- B. 按钮自动隐藏逻辑 ---
-        const settingsBtn = document.getElementById('settingsBtn');
-        const body = document.body;
-        const menu = document.getElementById('settingsMenu');
-        
-        // 检查菜单是否打开，如果打开了，按钮暂时不能隐身
-        const isMenuOpen = menu && menu.style.display === 'block';
-
-        if (appConfig.fabAutoHidden && !isMenuOpen) {
-            // 开启隐藏模式
-            settingsBtn.classList.add('auto-hide');
-            body.classList.add('fab-hidden-mode'); // 激活感应区
-        } else {
-            // 关闭隐藏模式
-            settingsBtn.classList.remove('auto-hide');
-            body.classList.remove('fab-hidden-mode');
-        }
-    };
-
-
-    if(fabSwitch) {
-        fabSwitch.addEventListener('change', function(e) {
-            appConfig.fabAutoHidden = e.target.checked;
-            localStorage.setItem('cfg_fabAutoHidden', appConfig.fabAutoHidden);
-            applySmartSettings();
-        });
-    }
-    
-    // 监听菜单打开/关闭，防止菜单开着的时候按钮没了
-    // 劫持原有的 toggleSettingsMenu 函数 (如果有的话) 或者添加监听
-    const originalToggle = window.toggleSettingsMenu;
-    window.toggleSettingsMenu = function() {
-        if(originalToggle) originalToggle();
-        
-        // 延时一下检查菜单状态
-        setTimeout(() => {
-            const menu = document.getElementById('settingsMenu');
-            const btn = document.getElementById('settingsBtn');
-            if(menu && menu.style.display === 'block') {
-                btn.classList.add('menu-open');
-                btn.classList.remove('auto-hide'); // 菜单开着时强制显示
-            } else {
-                btn.classList.remove('menu-open');
-                applySmartSettings(); // 菜单关了，恢复隐藏逻辑
-            }
-        }, 10);
-    };
-
-    // 立即执行一次配置应用
-    applySmartSettings();
-
-})();
-
-// ================= 🚑 JS 启动修复 =================
-        
-        // 等待页面完全加载后再启动社区功能
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('正在启动侧边社区...');
-            
-            // 1. 重新绑定触发按钮点击事件
-            const trigger = document.getElementById('triggerBtn');
-            const drawer = document.getElementById('commDrawer');
-            
-            if (trigger && drawer) {
-                // 移除旧的监听（如果有），添加新的
-                const newTrigger = trigger.cloneNode(true);
-                trigger.parentNode.replaceChild(newTrigger, trigger);
-                
-                newTrigger.addEventListener('click', function(e) {
-                    console.log('按钮被点击了！');
-                    e.stopPropagation(); // 防止冒泡
-                    drawer.classList.add('active');
-                });
-                console.log('✅ 触发按钮已激活');
-            } else {
-                console.error('❌ 找不到按钮或侧边栏，请检查HTML ID是否正确');
-            }
-
-            // 2. 初始化数据
-            if (typeof initCommunity === 'function') {
-                initCommunity();
-            }
-        });
-
+// V1.1: 社区仅在打开时初始化，按钮由统一感应逻辑控制。
 // ================= [JS] 侧边社区 + 交互逻辑 终极完整版 =================
 
         // 1. 社区数据配置
@@ -7345,73 +7217,7 @@ html.comm-auto-hide #triggerBtn.show {
         let userActions = JSON.parse(localStorage.getItem('comm_user_actions')) || {};
 
 
-// 4. 页面初始化：同步开关状态 & 启动感应
-        document.addEventListener('DOMContentLoaded', function() {
-            
-// --- 3. 统一回显与控制逻辑 ---
-setTimeout(() => {
-    const commSwitch = document.getElementById('switchCommunity');
-    const isAuto = localStorage.getItem('cfg_commAutoHide') === 'true';
-
-    if (commSwitch) {
-        commSwitch.checked = isAuto;
-        // 注意：这里绝对不要再调用 toggleCommunity()！
-        // 因为我们在页面顶部的脚本已经处理过显示/隐藏了。
-    }
-
-    // 更新按钮点击时的逻辑函数（搜索并替换你的 toggleCommunity 函数）
-    window.toggleCommunity = function(checkbox) {
-        const checked = checkbox.checked;
-        localStorage.setItem('cfg_commAutoHide', checked);
-        if (checked) {
-            document.documentElement.classList.add('comm-auto-hide');
-        } else {
-            document.documentElement.classList.remove('comm-auto-hide');
-        }
-    };
-}, 50);
-
-            // --- B. 启动鼠标分区感应 ---
-            if (typeof initMouseZone === 'function') initMouseZone();
-            
-            // --- C. 如果有其他初始化函数则执行 ---
-            if (typeof initCommunity === 'function') initCommunity(); 
-        });
-
-function initMouseZone() {
-    document.addEventListener('mousemove', (e) => {
-        const btn = document.getElementById('triggerBtn');
-        const settingsBtn = document.getElementById('settingsBtn');
-        
-        const dist = window.innerWidth - e.clientX; // 鼠标距离右边缘的距离
-        const mouseY = e.clientY;
-        const screenHeight = window.innerHeight;
-
-        // 社区按钮感应：仅当开启了“自动隐藏”时生效
-        const isCommAutoHide = localStorage.getItem('cfg_commAutoHide') === 'true';
-        if (isCommAutoHide && btn) {
-            if (mouseY < screenHeight * 0.75) { // 屏幕上半部分
-                if (dist < 60) btn.classList.add('show'); // 靠近滑出
-                else if (dist > 150) btn.classList.remove('show'); // 远离缩回
-            } else {
-                btn.classList.remove('show'); // 鼠标移到底部时缩回
-            }
-        }
-
-        // 设置按钮感应
-        const isFabAutoHide = localStorage.getItem('cfg_fabAutoHidden') === 'true';
-        if (isFabAutoHide && settingsBtn) {
-            if (mouseY >= screenHeight * 0.75) {
-                if (dist < 80) settingsBtn.classList.remove('auto-hide');
-                else settingsBtn.classList.add('auto-hide');
-            } else {
-                settingsBtn.classList.add('auto-hide');
-            }
-        }
-    });
-}
-
-        // 6. UI渲染 (分类与标签)
+// 6. UI渲染 (分类与标签)
         function renderCommUI() {
             const bigCats = document.getElementById('commBigCats');
             const subCats = document.getElementById('commSubCats');
@@ -7463,9 +7269,18 @@ function initMouseZone() {
 
         window.closeCommDrawer = () => document.getElementById('commDrawer').classList.remove('active');
 
-async function loadCommList() {
+const communityCache = new Map();
+let communityRequest = 0;
+const communityKey = () => JSON.stringify([AV.User.current()?.id || '',commState.activeCat,commState.activeTag,commState.isMine,commState.sort]);
+function escapeHTML(value) { return String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function jsArg(value) { return escapeHTML(JSON.stringify(String(value ?? ''))); }
+function safeWebUrl(value) { try { const u = new URL(value); return /^https?:$/.test(u.protocol) ? u.href : '#'; } catch(e) { return '#'; } }
+async function loadCommList(force = false) {
     const list = document.getElementById('commList');
     if (!list) return;
+    const request = ++communityRequest, key = communityKey();
+    const cached = communityCache.get(key);
+    if (!force && cached && Date.now()-cached.time < 60000) { list.innerHTML=cached.html; return; }
     list.innerHTML = '<div style="text-align:center;padding:20px;opacity:0.6;"><i class="fas fa-spinner fa-spin"></i> 加载中...</div>';
     
     try {
@@ -7495,6 +7310,7 @@ async function loadCommList() {
         
         query.limit(99); 
         const results = await query.find();
+        if (request !== communityRequest || key !== communityKey()) return;
 
         if (results.length === 0) {
             list.innerHTML = '<div style="text-align:center;padding:40px;opacity:0.5;">该分类下暂无资源</div>';
@@ -7511,10 +7327,11 @@ async function loadCommList() {
             } catch (e) { console.warn("未发现投票记录表"); }
         }
 
+        if (request !== communityRequest || key !== communityKey()) return;
         // --- 渲染逻辑：只显示列表，不再显示“综合”等分类标题 ---
         list.innerHTML = results.map((item, index) => {
             const title = item.get('title') || '无标题';
-            const url = item.get('url') || '#';
+            const url = safeWebUrl(item.get('url') || '#');
             const up = item.get('upVotes') || 0;
             const down = item.get('downVotes') || 0;
             const isOwner = currentUser && item.get('owner') && item.get('owner').id === currentUser.id;
@@ -7528,33 +7345,36 @@ async function loadCommList() {
                 <div class="comm-index">${serialNumber}</div>
                 <div style="flex: 1; display: flex; flex-direction: column; gap: 2px; overflow: hidden; margin-right: 10px;">
                     <div style="display: flex; align-items: center; gap: 6px;">
-                        <span class="comm-card-title" onclick="window.open('${url}', '_blank')">${title}</span>
+                        <span class="comm-card-title" onclick="window.open(${jsArg(url)}, '_blank', 'noopener,noreferrer')">${escapeHTML(title)}</span>
                         <i class="far fa-copy" style="font-size: 11px; color: #bbb; cursor: pointer;" 
-                           onclick="event.stopPropagation(); window.copyForImport('${title}', '${url}')"></i>
+                           onclick="event.stopPropagation(); window.copyForImport(${jsArg(title)}, ${jsArg(url)})"></i>
                     </div>
-                    <div class="comm-card-url">${url.replace(/^https?:\/\//, '')}</div>
+                    <div class="comm-card-url">${escapeHTML(url.replace(/^https?:\/\//, ''))}</div>
                 </div>
                 <div style="display: flex; align-items: center; border-left: 1px solid #f0f0f0; padding-left: 10px; margin-left: 5px;">
                     <div style="display: flex; gap: 15px; align-items: center;">
-                        <span onclick="event.stopPropagation(); window.handleVote('${item.id}', 'up')" 
+                        <span onclick="event.stopPropagation(); window.handleVote(${jsArg(item.id)}, 'up')" 
                               class="vote-btn ${voteType === 'up' ? 'vote-active' : ''}">
                             <i class="${voteType === 'up' ? 'fas' : 'far'} fa-thumbs-up"></i> 
-                            <small>${up}</small>
+                            <small>${escapeHTML(up)}</small>
                         </span>
-                        <span onclick="event.stopPropagation(); window.handleVote('${item.id}', 'down')" 
+                        <span onclick="event.stopPropagation(); window.handleVote(${jsArg(item.id)}, 'down')" 
                               class="vote-btn ${voteType === 'down' ? 'vote-active' : ''}">
                             <i class="${voteType === 'down' ? 'fas' : 'far'} fa-thumbs-down"></i> 
-                            <small>${down}</small>
+                            <small>${escapeHTML(down)}</small>
                         </span>
                     </div>
                     <div style="width: 30px; display: flex; justify-content: center; align-items: center; margin-left: 5px;">
-                        ${isOwner ? `<i class="fas fa-trash-alt comm-del-icon" onclick="event.stopPropagation(); commDel('${item.id}')"></i>` : ''}
+                        ${isOwner ? `<i class="fas fa-trash-alt comm-del-icon" onclick="event.stopPropagation(); commDel(${jsArg(item.id)})"></i>` : ''}
                     </div>
                 </div>
             </div>`;
         }).join('');
+        communityCache.set(key,{time:Date.now(),html:list.innerHTML});
+        if (communityCache.size > 30) communityCache.delete(communityCache.keys().next().value);
 
     } catch(e) {
+        if (request !== communityRequest || key !== communityKey()) return;
         console.error("加载失败:", e);
         list.innerHTML = '<div style="text-align:center;padding:20px;color:red;">数据读取异常</div>';
     }
@@ -7640,9 +7460,11 @@ window.handleVote = async function(siteId, type) {
         if (upDelta !== 0) site.increment('upVotes', upDelta);
         if (downDelta !== 0) site.increment('downVotes', downDelta);
         await site.save();
+        communityCache.clear();
         
     } catch (error) {
         console.error("同步失败:", error);
+        communityCache.clear(); loadCommList(true);
         // 如果失败，可选：在此处提示用户刷新页面
     }
 };
@@ -7673,169 +7495,15 @@ window.handleVote = async function(siteId, type) {
                 s.set('owner', AV.User.current()); s.set('likes', 0);
                 const acl = new AV.ACL(); acl.setPublicReadAccess(true); acl.setWriteAccess(AV.User.current(), true);
                 s.setACL(acl);
-                await s.save(); alert('发布成功'); document.getElementById('shareModal').style.display='none'; loadCommList();
+                await s.save(); alert('发布成功'); document.getElementById('shareModal').style.display='none'; communityCache.clear(); loadCommList(true);
             } catch(e) { alert('发布失败: ' + e.message); }
         };
         window.commDel = async (id) => {
-            if(confirm('确定删除？')) { const s = AV.Object.createWithoutData('CommunitySite', id); await s.destroy(); loadCommList(); }
+            if(confirm('确定删除？')) { const s = AV.Object.createWithoutData('CommunitySite', id); await s.destroy(); communityCache.clear(); loadCommList(true); }
         };
 
-// ================= [JS] 功能整合完整版 =================
-
-// --- 唯一保留的社区按钮开关逻辑 ---
-window.toggleCommunity = function(checkbox) {
-    // 1. 此时：勾选 = 开启自动隐藏
-    const isAutoHide = checkbox.checked; 
-    
-    // 2. 统一变量名，确保和 initMouseZone 对应
-    localStorage.setItem('cfg_commAutoHide', isAutoHide);
-    
-    const btn = document.getElementById('triggerBtn');
-    if (btn) {
-        // 彻底废除 display: none，改用类名切换
-        if (isAutoHide) {
-            // 模式 A：自动隐藏 (按钮向右缩进)
-            btn.classList.add('auto-hide-mode');
-        } else {
-            // 模式 B：常驻显示 (按钮回到原位)
-            btn.classList.remove('auto-hide-mode', 'show');
-        }
-    }
-};
-
-// --- 3. [新增] 设置按钮开关：控制常驻与自动隐藏 ---
-window.toggleFabAutoHide = function(checkbox) {
-    const isAutoHide = checkbox.checked; // 勾选 = 开启自动隐藏
-    localStorage.setItem('cfg_fabAutoHidden', isAutoHide);
-    
-    const settingsBtn = document.getElementById('settingsBtn');
-    if (settingsBtn) {
-        if (isAutoHide) {
-            // 模式 A：开启隐藏模式 (按钮缩回，等待感应)
-            settingsBtn.classList.add('auto-hide');
-        } else {
-            // 模式 B：常驻模式 (核心修复：关闭开关时立即移除类名，强制现身)
-            settingsBtn.classList.remove('auto-hide');
-        }
-    }
-};
-
-// 3. 页面初始化：同步开关状态 & 启动感应
-document.addEventListener('DOMContentLoaded', function() {
-    
-    // --- A. 同步开关状态 ---
-setTimeout(() => {
-    // 1. 社区按钮“自动隐藏”开关回显
-    const commSwitch = document.getElementById('switchCommunity');
-    const commState = localStorage.getItem('cfg_commAutoHide'); 
-    if (commSwitch) {
-        // 如果之前存的是 'true'，就打钩；否则不打钩
-        const isAuto = (commState === 'true'); 
-        commSwitch.checked = isAuto;
-        // 立即执行一次，确保页面刷新后按钮就在正确位置
-        if (typeof toggleCommunity === 'function') toggleCommunity(commSwitch);
-    }
-
-    // 2. 设置按钮“自动隐藏”开关回显
-    const fabSwitch = document.getElementById('switchFab');
-    const fabState = localStorage.getItem('cfg_fabAutoHidden');
-    if (fabSwitch) {
-        const isFabAuto = (fabState === 'true');
-        fabSwitch.checked = isFabAuto;
-        if (typeof toggleFabAutoHide === 'function') toggleFabAutoHide(fabSwitch);
-    }
-}, 150); // 稍微延迟，确保 DOM 完全就绪
-
-    // --- B. 启动鼠标分区感应 (75% vs 25%) ---
-    initMouseZone();
-});
-
-function initMouseZone() {
-    document.addEventListener('mousemove', (e) => {
-        const btn = document.getElementById('triggerBtn');
-        const settingsBtn = document.getElementById('settingsBtn');
-        
-        const dist = window.innerWidth - e.clientX; // 鼠标到右边缘的距离
-        const mouseY = e.clientY;
-        const screenHeight = window.innerHeight;
-
-        // --- 1. 社区按钮感应 (屏幕上方 75% 区域) ---
-        const isCommAutoHide = localStorage.getItem('cfg_commAutoHide') === 'true';
-        if (isCommAutoHide && btn) {
-            if (mouseY < screenHeight * 0.75) {
-                // 鼠标靠近右边缘 60px 以内，按钮滑出
-                if (dist < 60) btn.classList.add('show');
-                // 鼠标离开 150px 以外，按钮缩回
-                else if (dist > 150) btn.classList.remove('show');
-            } else {
-                // 鼠标移到了下半部分，确保社区按钮缩回
-                btn.classList.remove('show');
-            }
-        }
-
-        // --- 2. 设置按钮感应 (屏幕下方 25% 区域) ---
-        const isFabAutoHide = localStorage.getItem('cfg_fabAutoHidden') === 'true';
-        if (isFabAutoHide && settingsBtn) {
-            if (mouseY >= screenHeight * 0.75) {
-                if (dist < 80) settingsBtn.classList.remove('auto-hide');
-                else settingsBtn.classList.add('auto-hide');
-            } else {
-                settingsBtn.classList.add('auto-hide');
-            }
-        }
-    });
-}
-
-// ================= 🚑 补全丢失的社区初始化函数 =================
-
-// 6. [新增] 社区初始化 (修复大小分类不显示)
-function initCommunity() {
-    console.log('✅ 正在初始化社区大分类与小分类...');
-    
-    // 1. 确保数据存在
-    if (typeof COMM_CATS === 'undefined') {
-        console.error('❌ COMM_CATS 数据丢失！');
-        return;
-    }
-
-    // 2. 渲染界面 (这会生成"综合"、"娱乐"等按钮)
-    renderCommUI();
-    
-    // 3. 默认加载列表
-    loadCommList();
-}
-
-// 7. [新增] 确保 renderCommUI 能够正确运行
-// (防止之前的 renderCommUI 定义有问题，这里提供一份精简版作为保险)
-if (typeof renderCommUI !== 'function') {
-    window.renderCommUI = function() {
-        const bigCats = document.getElementById('commBigCats');
-        const subCats = document.getElementById('commSubCats');
-        const myBtn = document.getElementById('myPostsBtn');
-        const catWrapper = document.getElementById('commCatsWrapper');
-        
-        if (!bigCats || !subCats) return;
-
-        // 渲染大分类
-        bigCats.innerHTML = Object.keys(COMM_CATS).map(cat => 
-            `<div class="comm-cat-btn ${!commState.isMine && commState.activeCat===cat ? 'active':''}" onclick="commSwitchMode('${cat}')">${cat}</div>`
-        ).join('');
-
-        // 渲染小分类
-        if(commState.isMine) {
-            if(myBtn) myBtn.classList.add('active'); 
-            if(catWrapper) catWrapper.classList.add('nav-disabled'); 
-            subCats.innerHTML = '<div style="width:100%;text-align:center;font-size:12px;opacity:0.6;padding:10px">我的发布历史</div>';
-        } else {
-            if(myBtn) myBtn.classList.remove('active'); 
-            if(catWrapper) catWrapper.classList.remove('nav-disabled');
-            const tags = COMM_CATS[commState.activeCat] || [];
-            subCats.innerHTML = tags.map(tag => 
-                `<div class="comm-sub-tag ${commState.activeTag===tag ? 'active':''}" onclick="commFilterTag('${tag}')">${tag}</div>`
-            ).join('');
-        }
-    };
-}
+// 社区入口及统一开关由文件末尾初始化。
+function initCommunity() { renderCommUI(); }
 
 let sortableInstances = [];
 
@@ -7850,12 +7518,19 @@ function initLinkSortable() {
     // 找到所有网格容器
     const containers = document.querySelectorAll('.bookmarks-grid');
     containers.forEach(container => {
+        if (typeof Sortable === 'undefined') {
+            container.querySelectorAll('.bookmark-item[data-id]').forEach(item => { if (!item.dataset.nativeDrag) { item.dataset.nativeDrag='1'; setupBookmarkDragEvents(item, state.bookmarks.find(b => String(b.id) === item.dataset.id)?.id); } });
+            return;
+        }
         const ins = new Sortable(container, {
             animation: 250, // 腾出空位的动画时间
             ghostClass: 'sortable-ghost', // 拖拽时的占位阴影
-            filter: '.empty-slot, .add-row-btn, .remove-row-btn', // 这些元素不能被拖动
+            draggable: '.bookmark-item[data-id]',
+            filter: '.empty-slot, .add-row-btn, .remove-row-btn',
+            preventOnFilter: false, // 这些元素不能被拖动
             onEnd: function() {
-                console.log('拖拽排序完成，请点击右下角勾号保存');
+                persistGridOrder(container);
+                console.log('拖拽顺序已写入数据并保存');
             }
         });
         sortableInstances.push(ins);
@@ -7894,7 +7569,7 @@ window.importFromComm = function() {
         // 3. 把名字和网址填进去
         nameInput.value = data.name; 
         urlInput.value = data.url;
-        showToast('导入成功');
+        if (typeof showToast === 'function') showToast('导入成功'); else alert('导入成功');
     } else {
         alert('导入失败：找不到输入框，请检查 HTML 里的 id');
     }
@@ -7933,6 +7608,146 @@ window.deleteLink = function() {
     }
 };
         
+        // === 定向修复：统一开关、持久化排序及图标加载 ===
+        function persistGridOrder(grid, save = true) {
+            const nodes = [...grid.querySelectorAll(':scope > .bookmark-item[data-id]')];
+            nodes.forEach((node, index) => {
+                const bookmark = state.bookmarks.find(b => String(b.id) === node.dataset.id);
+                if (bookmark) { bookmark.order = index + 1; node.dataset.order = index + 1; }
+            });
+            if (save) saveData().catch(e => alert('排序保存失败：' + e.message));
+        }
+        // V1.1: cache binary image data separately from navigation configuration.
+        const presetIconHosts = new Set(["36kr.com", "agar.io", "ai.360.com", "aidn.jp", "chat.deepseek.com", "chat.openai.com", "chatglm.cn", "civitai.com", "claude.ai", "cli.im", "cn.bing.com", "convertio.co", "copilot.microsoft.com", "discord.com", "docs.qq.com", "freepacman.org", "gamma.app", "gemini.google.com", "h5.ele.me", "hackertyper.net", "huggingface.co", "im.qq.com", "juejin.cn", "kimi.moonshot.cn", "lanhuapp.com", "lumalabs.ai", "maimai.cn", "map.baidu.com", "map.qq.com", "mastergo.com", "metaso.cn", "movie.douban.com", "mubu.com", "music.163.com", "music.qishui.com", "neal.fun", "news.qq.com", "news.sina.com.cn", "open.spotify.com", "pan.baidu.com", "pan.quark.cn", "play.typeracer.com", "play2048.co", "poe.com", "pointerpointer.com", "quickdraw.withgoogle.com", "radio.garden", "runwayml.com", "shimo.im", "slack.com", "slither.io", "smallpdf.com", "sspai.com", "store.steampowered.com", "suno.com", "tetris.com", "tieba.baidu.com", "tinypng.com", "tongyi.aliyun.com", "translate.google.com", "twitter.com", "v.qq.com", "virtocean.com", "wallstreetcn.com", "wannianli.tianqi.com", "weather.com.cn", "weavesilk.com", "web.telegram.org", "web.whatsapp.com", "weibo.com", "www.10010.com", "www.10086.cn", "www.12306.cn", "www.189.cn", "www.3dmgame.com", "www.4399.com", "www.58.com", "www.acfun.cn", "www.agoda.com", "www.airbnb.cn", "www.airpano.com", "www.aliyundrive.com", "www.amap.com", "www.amazon.cn", "www.anjuke.com", "www.apple.com.cn", "www.bilibili.com", "www.booking.com", "www.boredbutton.com", "www.caixin.com", "www.canva.cn", "www.chinapost.com.cn", "www.coolapk.com", "www.crazygames.com", "www.csdn.net", "www.ctrip.com", "www.dangdang.com", "www.deepl.com", "www.dewu.com", "www.dianping.com", "www.douban.com", "www.doubao.com", "www.douyin.com", "www.douyu.com", "www.eastmoney.com", "www.facebook.com", "www.fang.com", "www.figma.com", "www.fliggy.com", "www.gamersky.com", "www.ganji.com", "www.gcores.com", "www.geoguessr.com", "www.goofish.com", "www.guancha.cn", "www.huxiu.com", "www.huya.com", "www.ifeng.com", "www.ikea.cn", "www.ilovepdf.com", "www.imdb.com", "www.infoq.cn", "www.instagram.com", "www.iqiyi.com", "www.ithome.com", "www.ixigua.com", "www.jd.com", "www.jiemian.com", "www.ke.com", "www.kongregate.com", "www.kuaidi100.com", "www.lanzou.com", "www.liblib.art", "www.linkedin.com", "www.ly.com", "www.mafengwo.cn", "www.meituan.com", "www.mgtv.com", "www.mi.com", "www.microsoft.com", "www.midjourney.com", "www.missevan.com", "www.netflix.com", "www.nike.com.cn", "www.people.com.cn", "www.perplexity.ai", "www.pinduoduo.com", "www.pinterest.com", "www.pixiv.net", "www.processon.com", "www.qingting.fm", "www.qunar.com", "www.reddit.com", "www.remove.bg", "www.rr.tv", "www.skype.com", "www.smzdm.com", "www.soulapp.cn", "www.taobao.com", "www.taptap.cn", "www.thepaper.cn", "www.tiktok.com", "www.tmall.com", "www.toutiao.com", "www.tripadvisor.cn", "www.tumblr.com", "www.twitch.tv", "www.uniqlo.cn", "www.uupoop.com", "www.v2ex.com", "www.vip.com", "www.vmall.com", "www.wikihow.com", "www.window-swap.com", "www.wps.cn", "www.xiachufang.com", "www.xiaohongshu.com", "www.ximalaya.com", "www.xmind.cn", "www.yikm.net", "www.youku.com", "www.youtube.com", "www.yuque.com", "www.zhihu.com", "wx.qq.com", "xinghuo.xfyun.cn", "xueqiu.com", "y.qq.com", "yiyan.baidu.com", "you.163.com", "yuanbao.tencent.com", "zh.wikipedia.org"]);
+        const iconMemory = new Map(), iconQueue = [], fontLoaded = new Set();
+        let iconRunning = 0;
+        const fontWeights = {'Dancing Script':700,'Pacifico':400,'Playfair Display':700,'Roboto':'400;700','Montserrat':700,'ZCOOL QingKe HuangYou':400,'Ma Shan Zheng':400,'Liu Jian Mao Cao':400,'Noto Sans SC':'300;400;500','Long Cang':400,'ZCOOL XiaoWei':400,'Caveat':700,'Shadows Into Light':400,'Fredericka the Great':400,'Special Elite':400};
+        function loadNavFont(value) {
+            const family = String(value||'').split(',')[0].trim().replace(/^['"]|['"]$/g,'');
+            if (!Object.hasOwn(fontWeights,family) || fontLoaded.has(family)) return;
+            fontLoaded.add(family);
+            const link = document.createElement('link'); link.rel='stylesheet';
+            const query='css2?family='+encodeURIComponent(family).replace(/%20/g,'+')+':wght@'+fontWeights[family]+'&display=swap';
+            link.href='https://fonts.font.im/'+query;
+            link.onerror=()=>{link.onerror=null;link.href='https://fonts.loli.net/'+query;};
+            document.head.appendChild(link);
+        }
+        async function compactBackground(blob) {
+            let bitmap;
+            try {
+                bitmap=await createImageBitmap(blob);
+                const scale=Math.min(1,2560/Math.max(bitmap.width,bitmap.height));
+                const canvas=document.createElement('canvas'); canvas.width=Math.max(1,Math.round(bitmap.width*scale)); canvas.height=Math.max(1,Math.round(bitmap.height*scale));
+                canvas.getContext('2d').drawImage(bitmap,0,0,canvas.width,canvas.height);
+                const result=await new Promise(r=>canvas.toBlob(r,'image/webp',.86));
+                return result && result.size<blob.size ? result:blob;
+            } catch(e) { return blob; } finally { if(bitmap) bitmap.close(); }
+        }
+        const iconDB = new Promise(resolve => {
+            try {
+                const req=indexedDB.open('YujianAssetsV1',1);
+                req.onupgradeneeded=()=>req.result.createObjectStore('icons');
+                req.onsuccess=()=>resolve(req.result); req.onerror=req.onblocked=()=>resolve(null);
+            } catch(e) { resolve(null); }
+        });
+        async function iconStore(key, value) {
+            const db=await iconDB; if(!db)return null;
+            return new Promise(resolve=>{ try {
+                const tx=db.transaction('icons',value===undefined?'readonly':'readwrite');
+                const req=value===undefined?tx.objectStore('icons').get(key):tx.objectStore('icons').put(value,key);
+                req.onsuccess=()=>resolve(req.result||null); req.onerror=()=>resolve(null); tx.onabort=()=>resolve(null);
+            } catch(e){resolve(null);} });
+        }
+        function queueIcon(task) {return new Promise(resolve=>{iconQueue.push(async()=>{try{resolve(await task());}catch(e){resolve(null);}}); drainIcons();});}
+        function drainIcons(){while(iconRunning<5&&iconQueue.length){iconRunning++;iconQueue.shift()().finally(()=>{iconRunning--;drainIcons();});}}
+        function checkImage(src, timeout=2200) {return new Promise(resolve=>{
+            const img=new Image(); let done=false;
+            const finish=v=>{if(done)return;done=true;clearTimeout(timer);img.onload=img.onerror=null;resolve(v);};
+            const timer=setTimeout(()=>{finish(null);img.removeAttribute('src');},timeout);
+            img.onload=()=>finish(img.naturalWidth>=8?src:null);img.onerror=()=>finish(null);img.referrerPolicy='no-referrer';img.src=src;
+        });}
+        async function fetchIcon(sources,key) {
+            for(const src of sources) {
+                if(!src)continue;
+                const controller=new AbortController(), timer=setTimeout(()=>controller.abort(),2200);
+                try {
+                    const res=await fetch(src,{signal:controller.signal,credentials:'omit',referrerPolicy:'no-referrer'});
+                    if(res.ok){const blob=await res.blob();if(blob.size>0&&blob.size<=262144&&(/^image\//.test(blob.type)||blob.type==='application/octet-stream')){
+                        const objectURL=URL.createObjectURL(blob);
+                        if(await checkImage(objectURL)){await iconStore(key,{blob,time:Date.now()});return objectURL;}
+                        URL.revokeObjectURL(objectURL);
+                    }}
+                }catch(e){}finally{clearTimeout(timer);}
+                // CORS-restricted sources still work as ordinary images, with browser HTTP cache.
+                if(await checkImage(src))return src;
+            }
+            return null;
+        }
+        function loadBookmarkIcon(div) {
+            if(div.dataset.iconStarted)return;div.dataset.iconStarted='1';
+            const url=div.dataset.iconUrl, custom=div.dataset.customIcon;
+            let host;try{host=new URL(url).hostname;}catch(e){return;}
+            const automatic=!custom||/(?:google\.[^/]+\/s2\/favicons|gstatic\.com\/favicon|googleusercontent\.com\/favicon)/i.test(custom);
+            // V1.1.1：默认网站图标优先由本站静态目录提供，按域名匹配。
+            const presetHosts = presetIconHosts;
+            const hosted = presetHosts.has(host) ? new URL('icons/'+encodeURIComponent(host)+'.png', document.baseURI).href : null;
+            const sources=automatic?[getFavicon(url),'https://favicon.cccyun.cc/'+encodeURIComponent(host),new URL('/favicon.ico',url).href]:[custom,getFavicon(url)];
+            const key=automatic?'host:'+host:'custom:'+custom;
+            // 静态图标先尝试一次；失败才进入原有 IndexedDB 与动态接口流程。
+            if(!iconMemory.has(key)) iconMemory.set(key,(async()=>{
+                if(automatic && hosted){const local=await checkImage(hosted,2500);if(local)return local;}
+                const cached=await iconStore(key);
+                if(cached?.blob){const src=URL.createObjectURL(cached.blob);if(Date.now()-cached.time>30*86400000)queueIcon(()=>fetchIcon(sources,key)).then(fresh=>{if(fresh?.startsWith('blob:'))URL.revokeObjectURL(fresh);});return src;}
+                return queueIcon(()=>fetchIcon(sources,key));
+            })());
+            iconMemory.get(key).then(src=>{if(!src)return;const img=new Image();img.referrerPolicy='no-referrer';img.style.cssText='width:100%;height:100%;object-fit:contain;border-radius:4px;';img.onload=()=>{div.style.background='transparent';div.style.borderRadius='0';div.replaceChildren(img);};img.src=src;});
+        }
+        let zonesInstalled = false;
+        let fabNear = false;
+        function syncRightButtons() {
+            const root = document.documentElement, btn = document.getElementById('settingsBtn'), trigger = document.getElementById('triggerBtn');
+            const comm = localStorage.getItem('cfg_commAutoHide') === 'true';
+            const fab = localStorage.getItem('cfg_fabAutoHidden') === 'true';
+            root.classList.toggle('comm-auto-hide', comm); root.classList.toggle('fab-auto-hide', fab);
+            document.getElementById('switchCommunity').checked = comm;
+            document.getElementById('switchFab').checked = fab;
+            trigger.style.removeProperty('display'); trigger.classList.remove('auto-hide-mode');
+            if (!comm) trigger.classList.remove('show');
+            btn.classList.remove('auto-hide');
+            btn.classList.toggle('menu-open', elements.settingsMenu.classList.contains('show'));
+            btn.classList.toggle('edge-reveal', fabNear);
+        }
+        window.toggleCommunity = checkbox => { localStorage.setItem('cfg_commAutoHide', String(checkbox.checked)); document.getElementById('triggerBtn').classList.remove('show'); syncRightButtons(); };
+        window.toggleFabAutoHide = checkbox => { localStorage.setItem('cfg_fabAutoHidden', String(checkbox.checked)); fabNear = false; syncRightButtons(); };
+        window.applySmartSettings = syncRightButtons;
+        function initMouseZone() {
+            if (zonesInstalled) return; zonesInstalled = true;
+            document.addEventListener('mousemove', e => {
+                const dist = innerWidth - e.clientX, lower = e.clientY >= innerHeight * .75;
+                const trigger = document.getElementById('triggerBtn');
+                if (localStorage.getItem('cfg_commAutoHide') === 'true') {
+                    if (!lower && dist < 60) trigger.classList.add('show');
+                    else if (lower || dist > 150) trigger.classList.remove('show');
+                }
+                fabNear = lower && dist < 80; syncRightButtons();
+            });
+            document.getElementById('settingsWrapper').addEventListener('pointerdown', e => {
+                if (e.pointerType !== 'mouse' && localStorage.getItem('cfg_fabAutoHidden') === 'true') { fabNear = true; syncRightButtons(); }
+            });
+            new MutationObserver(syncRightButtons).observe(elements.settingsMenu, {attributes:true, attributeFilter:['class']});
+            window.addEventListener('storage', syncRightButtons);
+        };
+        syncRightButtons();
+        initMouseZone();
+        document.getElementById('triggerBtn').addEventListener('click', e => {
+            e.stopPropagation();
+            document.getElementById('commDrawer').classList.add('active');
+            initCommunity();
+        });
+        window.addEventListener('online', () => {
+            const user = AV.User.current();
+            if (user && localStorage.getItem('navPending:' + user.id) === 'true' && localStorage.getItem('navCacheOwner') === String(user.id)) saveData(true).catch(console.error);
+        });
         initApp();
     </script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301a35b7e07294d87301792088814092" integrity="sha512-UKNk8GbxkABxKcXYuLkO16EleLGUkcvJWtpSNmExE0Too3ZaFAxTscNWEc1OdAv5/BikHawapSCaiD2XCmp+Bw==" data-cf-beacon='{"version":"2024.11.0","token":"ae984c74af4e441f87e8f4b76b44f3c6","r":1,"spa":2}' crossorigin="anonymous"></script>
